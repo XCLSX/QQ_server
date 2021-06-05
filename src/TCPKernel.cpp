@@ -10,8 +10,6 @@ static const ProtocolMap m_ProtocolMapEntries[] =
 {
     {DEF_PACK_REGISTER_RQ , &TcpKernel::RegisterRq},
     {DEF_PACK_LOGIN_RQ , &TcpKernel::LoginRq},
-    {DEF_PACK_CREATEROOM_RQ,&TcpKernel::CreateRoomRq},
-    {DEF_PACK_ASKROOM_RQ,&TcpKernel::AskRoomRq},
     {0,0}
 };
 
@@ -51,7 +49,7 @@ void TcpKernel::Close()
 }
 
 
-void TcpKernel::DealData(int clientfd,char *szbuf,int nlen)
+void TcpKernel::DealData(int clientfd,char *szbuf)
 {
     PackType *pType = (PackType*)szbuf;
     int i = 0;
@@ -60,7 +58,7 @@ void TcpKernel::DealData(int clientfd,char *szbuf,int nlen)
         if(*pType == m_ProtocolMapEntries[i].m_type)
         {
             PFUN fun= m_ProtocolMapEntries[i].m_pfun;
-            (this->*fun)(clientfd,szbuf,nlen);
+            (this->*fun)(clientfd,szbuf);
         }
         else if(m_ProtocolMapEntries[i].m_type == 0 &&
                 m_ProtocolMapEntries[i].m_pfun == 0)
@@ -72,7 +70,7 @@ void TcpKernel::DealData(int clientfd,char *szbuf,int nlen)
 
 
 //注册
-void TcpKernel::RegisterRq(int clientfd,char* szbuf,int nlen)
+void TcpKernel::RegisterRq(int clientfd,char* szbuf)
 {
     printf("clientfd:%d RegisterRq\n", clientfd);
 
@@ -105,7 +103,7 @@ void TcpKernel::RegisterRq(int clientfd,char* szbuf,int nlen)
     m_tcp->SendData( clientfd , (char*)&rs , sizeof(rs) );
 }
 //登录
-void TcpKernel::LoginRq(int clientfd ,char* szbuf,int nlen)
+void TcpKernel::LoginRq(int clientfd ,char* szbuf)
 {
     printf("clientfd:%d LoginRq\n", clientfd);
 
@@ -152,55 +150,8 @@ void TcpKernel::LoginRq(int clientfd ,char* szbuf,int nlen)
     m_tcp->SendData( clientfd , (char*)&rs , sizeof(rs) );
 }
 
-void TcpKernel::AskRoomRq(int clientfd ,char* szbuf,int nlen)
-{
-    STRU_ASKROOM_RQ *rq = (STRU_ASKROOM_RQ*) szbuf;
-    STRU_ASKROOM_RS rs;
-    list<string> ls;
-    char szsql[_DEF_SQLIEN] = {0};
-    snprintf(szsql,sizeof(szsql),"select room_id,room_name,room_creator_name from t_room;");
-    m_sql->SelectMysql(szsql,3,ls);
-    int i=0;
-    if(ls.size()>0)
-        rs.m_lResult = ask_room_success;
-    else
-        rs.m_lResult = ask_room_failed;
-    while(ls.size()>0)
-    {
-        rs.m_RoomList[i].m_Roomid = atoi(ls.front().c_str()); ls.pop_front();
-        strcmp(rs.m_RoomList[i].sz_Roomname,ls.front().c_str());  ls.pop_front();
-        strcmp(rs.m_RoomList[i].sz_RoomCreator,ls.front().c_str());   ls.pop_front();
-        i++;
-        if(i==MAX_ROOMLIST)
-            break;
-    }
-    m_tcp->SendData(clientfd,(char *)&rs,sizeof(rs));
 
-}
-
-void TcpKernel::CreateRoomRq(int clientfd, char *szbuf, int nlen)
-{
-    STRU_CREATEROOM_RQ *rq = (STRU_CREATEROOM_RQ*)szbuf;
-    STRU_CREATEROOM_RS rs;
-    char szsql[_DEF_SQLIEN] = {0};
-    snprintf(szsql,sizeof(szsql),"insert into t_room values(null,'%s',%d,null,null,null,null,'%s');"
-             ,rq->m_RoomName,rq->m_userid,rq->m_RoomName);
-    m_sql->UpdataMysql(szsql);
-    list<string> ls;
-    bzero(szsql,sizeof(szsql));
-    snprintf(szsql,sizeof(szsql),"select room_id from t_room where user1_id = %d;",rq->m_userid);
-    m_sql->SelectMysql(szsql,1,ls);
-    if(ls.size()==0)
-        rs.m_lResult = create_failed;
-    else
-    {
-        rs.m_lResult = create_success;
-        rs.m_RoomId = atoi(ls.front().c_str());
-    }
-    m_tcp->SendData( clientfd , (char*)&rs , sizeof(rs) );
-}
-
-void TcpKernel::AddfriendRq(int clientfd, char *szbuf, int nlen)
+void TcpKernel::AddfriendRq(int clientfd, char *szbuf)
 {
     STRU_ADD_FRIEND_RQ *rq = (STRU_ADD_FRIEND_RQ*)szbuf;
     STRU_ADD_FRIEND_RS rs;

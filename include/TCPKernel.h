@@ -7,7 +7,7 @@
 #include "Mysql.h"
 
 class TcpKernel;
-typedef void (TcpKernel::*PFUN)(int,char*,int nlen);
+typedef void (TcpKernel::*PFUN)(int,char*);
 
 typedef struct
 {
@@ -22,18 +22,14 @@ class TcpKernel:public IKernel
 public:
     int Open();
     void Close();
-    void DealData(int,char*,int);
+    void DealData(int,char*);
 
     //注册
-    void RegisterRq(int,char*,int);
+    void RegisterRq(int,char*);
     //登录
-    void LoginRq(int,char*,int);
-    //请求房间列表
-    void AskRoomRq(int,char*,int);
-    //创建房间
-    void CreateRoomRq(int,char*,int);
+    void LoginRq(int,char*);
     //添加好友
-    void AddfriendRq(int,char*,int);
+    void AddfriendRq(int,char*);
 
  private:
     CMysql * m_sql;
