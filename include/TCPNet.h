@@ -6,7 +6,7 @@
 class IKernel
 {
 public:
-    virtual void DealData(int,char*) = 0;
+    virtual void DealData(int,char*,int) = 0;
 };
 
 class TcpNet

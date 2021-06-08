@@ -116,7 +116,7 @@ void *TcpNet::Info_Recv(void *arg)
     int nPackSize = 0;
     char *pSzBuf = NULL;
     nRelReadNum = recv(clientfd,&nPackSize,sizeof(nPackSize),0);
-    if(nRelReadNum < 0)
+    if(nRelReadNum <= 0)
     {
         close(clientfd);
         return NULL;
@@ -134,7 +134,7 @@ void *TcpNet::Info_Recv(void *arg)
             nPackSize -= nRelReadNum;
         }
     }
-    m_pThis->m_kernel->DealData(clientfd,pSzBuf);
+    m_pThis->m_kernel->DealData(clientfd,pSzBuf,nOffSet);
     m_pThis->Addfd(clientfd,TRUE );
     printf("pszbuf = %p \n",pSzBuf);
     if(pSzBuf != NULL)
