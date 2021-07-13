@@ -5,7 +5,7 @@
 
 #include "TCPNet.h"
 #include "Mysql.h"
-
+#include <packdef.h>
 class TcpKernel;
 typedef void (TcpKernel::*PFUN)(int,char*,int nlen);
 
@@ -15,7 +15,21 @@ typedef struct
     PFUN m_pfun;
 } ProtocolMap;
 
-
+typedef struct UserInfo
+{
+    UserInfo()
+    {
+        sock_fd = 0;
+        memset(m_szName,0,MAX_SIZE);
+        memset(m_szfelling,0,MAX_SIZE);
+        status = 0;
+    }
+    int sock_fd;
+    int iocnid;
+    char m_szName[MAX_SIZE];
+    char m_szfelling[MAX_SIZE];
+    int status;
+}UserInfo;
 
 class TcpKernel:public IKernel
 {
@@ -23,15 +37,20 @@ public:
     int Open();
     void Close();
     void DealData(int,char*,int);
-
+    UserInfo *GetUserInfo(int );
     //注册
-    void RegisterRq(int,char*,int);
+    void Register(int,char*,int);
     //登录
-    void LoginRq(int,char*,int);
+    void Login(int,char*,int);
+    //查找好友
+    void SearchFriend(int,char*,int);
 
+    //发送好友列表
+    void PostFriList(int,int);
  private:
     CMysql * m_sql;
     TcpNet * m_tcp;
+    map<int,UserInfo*> m_mapIdtoUserInfo;
 };
 
 
