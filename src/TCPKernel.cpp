@@ -17,6 +17,7 @@ static const ProtocolMap m_ProtocolMapEntries[] =
     {DEF_PACK_REGISTER_RQ , &TcpKernel::Register},
     {DEF_PACK_LOGIN_RQ , &TcpKernel::Login},
     {DEF_PACK_SEARCHFRIEND_RQ,&TcpKernel::SearchFriend},
+    {DEF_PACK_ADDFRIEND_RQ,&TcpKernel::AddFriend},
     {0,0}
 };
 #define RootPath   "/home/colin/Video/"
@@ -76,24 +77,25 @@ void TcpKernel::DealData(int clientfd,char *szbuf,int nlen)
     return;
 }
 
-UserInfo *TcpKernel::GetUserInfo(int user_id)
+STRU_USER_INFO *TcpKernel::GetUserInfo(int m_userid)
 {
     char szsql[MAX_SIZE] = {0};
     list<string> ls;
-    sprintf(szsql,"select icon_id,user_name,felling,status from t_userInfo where user_id = %d;",user_id);
+    sprintf(szsql,"select icon_id,user_name,felling,status from t_user where user_id = %d;",m_userid);
     if(!m_sql->SelectMysql(szsql,4,ls))
     {
         printf("sql error:%s\n",szsql);
         return NULL;
     }
-    UserInfo *uInfo = new UserInfo;
-    uInfo->iocnid = atoi(ls.front().c_str());   ls.pop_front();
-    strcpy(uInfo->m_szName,ls.front().c_str());       ls.pop_front();
-    strcpy(uInfo->m_szfelling ,ls.front().c_str());    ls.pop_front();
-    uInfo->status = atoi(ls.front().c_str());           ls.pop_front();
+    STRU_USER_INFO *uInfo = new STRU_USER_INFO;
+    uInfo->m_icon_id = atoi(ls.front().c_str());   ls.pop_front();
+    strcpy(uInfo->m_userName,ls.front().c_str());       ls.pop_front();
+    strcpy(uInfo->sz_feeling ,ls.front().c_str());    ls.pop_front();
+    uInfo->m_status = atoi(ls.front().c_str());           ls.pop_front();
     return  uInfo;
-
 }
+
+
 
 
 //注册
@@ -158,8 +160,15 @@ void TcpKernel::Login(int clientfd ,char* szbuf,int nlen)
     }
     else
     {
+        //修改登录状态
+        memset(szsql,0,sizeof(szsql));
+        sprintf(szsql,"update  t_user set status = 1 where user_id = %d;",user_id);
+        if(!m_sql->UpdataMysql(szsql))
+        {
+            printf("sql error:%s\n",szsql);
+        }
         //录入映射
-        UserInfo *userInfo = new UserInfo;
+        UserInfo_S *userInfo = new UserInfo_S;
         userInfo->sock_fd = clientfd;
         ls.clear();
         sprintf(szsql,"select icon_id,user_name,felling,status from t_user where user_id = %d;",user_id);
@@ -180,6 +189,7 @@ void TcpKernel::Login(int clientfd ,char* szbuf,int nlen)
         strcpy(rs.m_userInfo.sz_feeling,userInfo->m_szfelling);
         rs.m_userInfo.m_status = userInfo->status;
         rs.m_userInfo.m_user_id = user_id;
+
     }
 
     m_tcp->SendData( clientfd , (char*)&rs , sizeof(rs) );
@@ -187,7 +197,7 @@ void TcpKernel::Login(int clientfd ,char* szbuf,int nlen)
     //发送好友列表
     PostFriList(clientfd,rs.m_userInfo.m_user_id);
 }
-
+//查找好友
 void TcpKernel::SearchFriend(int clientfd ,char* szbuf,int nlen)
 {
     STRU_SEARCHFRIEND_RQ *rq = (STRU_SEARCHFRIEND_RQ*)szbuf;
@@ -213,6 +223,26 @@ void TcpKernel::SearchFriend(int clientfd ,char* szbuf,int nlen)
         strcpy(rs.m_userInfoArr[i].sz_feeling,ls.front().c_str());          ls.pop_front();
     }
     m_tcp->SendData(clientfd,(char *)&rs,sizeof(rs));
+}
+//添加好友
+void TcpKernel::AddFriend(int clientfd ,char* szbuf,int nlen)
+{
+    STRU_ADDFRIEND_RQ *rq = (STRU_ADDFRIEND_RQ*)szbuf;
+    //在线
+    if(m_mapIdtoUserInfo.find(rq->m_frid)!=m_mapIdtoUserInfo.end())
+    {
+        int sockfd = m_mapIdtoUserInfo[rq->m_frid]->sock_fd;
+        m_tcp->SendData(sockfd,szbuf,nlen);
+    }
+    //离线
+    else
+    {
+        char szsql[_DEF_SQLIEN] = {0};
+        list<string> ls;
+        sprintf(szsql,"insert into t_offAddfriend values(%d,%d,'%s','%s',%d,'%s',null);"
+                ,rq->m_frid,rq->m_UserInfo.m_user_id,rq->m_UserInfo.m_userAccount,
+                rq->m_UserInfo.m_userName,rq->m_UserInfo.m_icon_id,rq->m_UserInfo.sz_feeling);
+    }
 }
 
 void TcpKernel::PostFriList(int clientfd,int userid)

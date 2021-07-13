@@ -15,9 +15,9 @@ typedef struct
     PFUN m_pfun;
 } ProtocolMap;
 
-typedef struct UserInfo
+typedef struct UserInfo_S
 {
-    UserInfo()
+    UserInfo_S()
     {
         sock_fd = 0;
         memset(m_szName,0,MAX_SIZE);
@@ -29,7 +29,7 @@ typedef struct UserInfo
     char m_szName[MAX_SIZE];
     char m_szfelling[MAX_SIZE];
     int status;
-}UserInfo;
+}UserInfo_S;
 
 class TcpKernel:public IKernel
 {
@@ -37,7 +37,7 @@ public:
     int Open();
     void Close();
     void DealData(int,char*,int);
-    UserInfo *GetUserInfo(int );
+    STRU_USER_INFO *GetUserInfo(int );
     //注册
     void Register(int,char*,int);
     //登录
@@ -45,12 +45,14 @@ public:
     //查找好友
     void SearchFriend(int,char*,int);
 
+    //添加好友
+    void AddFriend(int,char*,int);
     //发送好友列表
     void PostFriList(int,int);
  private:
     CMysql * m_sql;
     TcpNet * m_tcp;
-    map<int,UserInfo*> m_mapIdtoUserInfo;
+    map<int,UserInfo_S*> m_mapIdtoUserInfo;
 };
 
 
