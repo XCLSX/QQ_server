@@ -36,7 +36,7 @@ class TcpKernel:public IKernel
 public:
     int Open();
     void Close();
-    void DealData(int,char*,int);
+    void DealData(int clientfd ,char* szbuf,int nlen);
     STRU_USER_INFO *GetUserInfo(int );
     //注册
     void Register(int,char*,int);
@@ -45,10 +45,15 @@ public:
     //查找好友
     void SearchFriend(int,char*,int);
 
+    //转发好友请求
+    void RepeatFriendRq(int,char*,int);
     //添加好友
     void AddFriend(int,char*,int);
     //发送好友列表
     void PostFriList(int,int);
+
+
+    void Test(int clientfd ,char* szbuf,int nlen);
  private:
     CMysql * m_sql;
     TcpNet * m_tcp;

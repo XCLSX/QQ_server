@@ -17,7 +17,9 @@ static const ProtocolMap m_ProtocolMapEntries[] =
     {DEF_PACK_REGISTER_RQ , &TcpKernel::Register},
     {DEF_PACK_LOGIN_RQ , &TcpKernel::Login},
     {DEF_PACK_SEARCHFRIEND_RQ,&TcpKernel::SearchFriend},
-    {DEF_PACK_ADDFRIEND_RQ,&TcpKernel::AddFriend},
+    {DEF_PACK_ADDFRIEND_RQ,&TcpKernel::RepeatFriendRq},
+    {DEF_PACK_ADDFRIEND_RS,&TcpKernel::AddFriend},
+    {DEF_PACK_TEST,&TcpKernel::Test},
     {0,0}
 };
 #define RootPath   "/home/colin/Video/"
@@ -206,7 +208,7 @@ void TcpKernel::SearchFriend(int clientfd ,char* szbuf,int nlen)
     list<string> ls;
 
     sprintf(szsql,"select * from t_user where user_name like  '%%%s%';",rq->m_szBuf);
-    cout<<szsql<<endl;
+   // cout<<szsql<<endl;
     if(!m_sql->SelectMysql(szsql,7,ls))
     {
         printf("sql error:%s\n",szsql);
@@ -224,8 +226,8 @@ void TcpKernel::SearchFriend(int clientfd ,char* szbuf,int nlen)
     }
     m_tcp->SendData(clientfd,(char *)&rs,sizeof(rs));
 }
-//添加好友
-void TcpKernel::AddFriend(int clientfd ,char* szbuf,int nlen)
+//转发好友请求
+void TcpKernel::RepeatFriendRq(int clientfd ,char* szbuf,int nlen)
 {
     STRU_ADDFRIEND_RQ *rq = (STRU_ADDFRIEND_RQ*)szbuf;
     //在线
@@ -243,6 +245,36 @@ void TcpKernel::AddFriend(int clientfd ,char* szbuf,int nlen)
                 ,rq->m_frid,rq->m_UserInfo.m_user_id,rq->m_UserInfo.m_userAccount,
                 rq->m_UserInfo.m_userName,rq->m_UserInfo.m_icon_id,rq->m_UserInfo.sz_feeling);
     }
+}
+//添加好友
+void TcpKernel::AddFriend(int clientfd ,char* szbuf,int nlen)
+{
+    STRU_ADDFRIEND_RS *rs = (STRU_ADDFRIEND_RS*)szbuf;
+    char szsql[_DEF_SQLIEN] = {0};
+    list<string> ls;
+    sprintf(szsql,"insert into t_friend values(%d,%d);",rs->m_frid,rs->m_userid);
+    if(!m_sql->UpdataMysql(szsql))
+    {
+        printf("sql error:%s\n");
+        return ;
+    }
+    bzero(szsql,sizeof(szsql));
+    sprintf(szsql,"insert into t_friend values(%d,%d);",rs->m_userid,rs->m_frid);
+    if(!m_sql->UpdataMysql(szsql))
+    {
+        printf("sql error:%s\n");
+        return ;
+    }
+    //更新双方好友信息
+    STRU_UPDATE_STATUS sus;
+
+    sus.m_UserInfo = *GetUserInfo(rs->m_frid);
+    m_tcp->SendData(m_mapIdtoUserInfo[rs->m_userid]->sock_fd,(char *)&sus,sizeof(sus));
+
+    bzero(&sus,sizeof(sus));
+
+    sus.m_UserInfo = *GetUserInfo(rs->m_userid);
+    m_tcp->SendData(m_mapIdtoUserInfo[rs->m_frid]->sock_fd,(char *)&sus,sizeof(sus));
 }
 
 void TcpKernel::PostFriList(int clientfd,int userid)
@@ -270,6 +302,11 @@ void TcpKernel::PostFriList(int clientfd,int userid)
         i++;
     }
     m_tcp->SendData(clientfd,(char *)&rs,sizeof(rs));
+}
+
+void TcpKernel::Test(int clientfd, char *szbuf, int nlen)
+{
+    cout<<"sockfd:\t"<<clientfd<<"Net success\n";
 }
 
 
