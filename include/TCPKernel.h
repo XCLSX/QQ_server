@@ -51,8 +51,11 @@ public:
     void AddFriend(int,char*,int);
     //发送好友列表
     void PostFriList(int,int);
+    //转发消息
+    void RepeatMsg(int clientfd ,char* szbuf,int nlen);
 
-
+    //获取离线信息
+    void GetOffMsg(int clientfd,int user_id);
     void Test(int clientfd ,char* szbuf,int nlen);
  private:
     CMysql * m_sql;
