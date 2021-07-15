@@ -20,15 +20,18 @@ typedef struct UserInfo_S
     UserInfo_S()
     {
         sock_fd = 0;
+        icon_id = 0;
         memset(m_szName,0,MAX_SIZE);
         memset(m_szfelling,0,MAX_SIZE);
         status = 0;
+        m_user_id = 0;
     }
     int sock_fd;
-    int iocnid;
+    int icon_id;
     char m_szName[MAX_SIZE];
     char m_szfelling[MAX_SIZE];
     int status;
+    int m_user_id;
 }UserInfo_S;
 
 class TcpKernel:public IKernel
@@ -56,24 +59,20 @@ public:
 
     //获取离线信息
     void GetOffMsg(int clientfd,int user_id);
+
+    //下线
+    void OffLine(int clientfd ,char* szbuf,int nlen);
     void Test(int clientfd ,char* szbuf,int nlen);
+
+    STRU_USER_INFO* Info_sToInfo(UserInfo_S*);
  private:
     CMysql * m_sql;
     TcpNet * m_tcp;
-    map<int,UserInfo_S*> m_mapIdtoUserInfo;
+    unordered_map<int,UserInfo_S*> m_mapIdtoUserInfo;
+    pthread_mutex_t lock;
 };
 
 
 
 
-
-
-////读取上传的视频流信息
-//void UpLoadVideoInfoRq(int,char*);
-//void UpLoadVideoStreamRq(int,char*);
-//void GetVideoRq(int,char*);
-//char* GetVideoPath(char*);
-//void QuitRq(int,char*);
-//void PraiseVideoRq(int,char*);
-//void GetAuthorInfoRq(int,char*);
 #endif

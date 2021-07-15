@@ -17,6 +17,7 @@
 
 #include<iostream>
 #include<map>
+#include <unordered_map>
 #include<list>
 
 using namespace std;
@@ -61,6 +62,8 @@ typedef enum Net_PACK
     DEF_PACK_UPDATESTATUS,                      //更新用户状态
 
     DEF_PACK_SENDMSG_RQ,                        //发送聊天信息请求
+
+    DEF_PACK_OFFLINE_RQ,                        //下线请求
 
 
     DEF_PACK_TEST,
@@ -262,4 +265,15 @@ typedef struct STRU_SENDMSG_RQ
     int m_Touserid;
     char msg[MAX_MGS_SIZE];
 }STRU_SENDMSG_RQ;
+
+typedef struct STRU_OFFLINE_RQ
+{
+    STRU_OFFLINE_RQ()
+    {
+        m_nType = DEF_PACK_OFFLINE_RQ;
+        m_userid = 0;
+    }
+    PackType m_nType;
+    int m_userid;
+}STRU_OFFLINE_RQ;
 #endif
