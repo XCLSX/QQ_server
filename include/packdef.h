@@ -40,9 +40,6 @@ using namespace std;
 #define _DEF_TIMEOUT 10
 #define _DEF_SQLIEN 400
 
-#define BOOL bool
-#define DEF_PACK_BASE  (10000)
-
 typedef enum Net_PACK
 {
     DEF_PACK_REGISTER_RQ = 10000,               //注册请求
@@ -65,6 +62,9 @@ typedef enum Net_PACK
 
     DEF_PACK_OFFLINE_RQ,                        //下线请求
 
+    DEF_PACK_UPLOAD_RQ,                         //上传文件请求
+    DEF_PACK_UPLOAD_RS,
+    DEF_PACK_FILEBLOCK_RQ,                      //发送文件块请求
 
     DEF_PACK_TEST,
 }Net_PACK;
@@ -121,6 +121,26 @@ typedef int PackType;
             char sz_feeling[MAX_SIZE];
         }STRU_USER_INFO;
 
+        //文件信息
+        typedef struct STRU_FILE_INFO
+        {
+            STRU_FILE_INFO()
+            {
+                memset(fileMd5,0,sizeof(fileMd5));
+                filePos = 0;
+                fileSize = 0;
+                memset(fileName,0,sizeof (fileName));
+                memset(filePath,0,sizeof(filePath));
+                pFile = NULL;
+            }
+            char fileMd5[MAX_SIZE];
+            int64_t filePos;
+            int64_t fileSize;
+            char filePath[MAX_PATH];
+            char fileName[MAX_PATH];
+            FILE * pFile;
+
+        }STRU_FILE_INFO;
 //注册
 typedef struct STRU_REGISTER_RQ
 {
@@ -251,6 +271,7 @@ typedef struct STRU_TEST
     PackType m_nType;
 }STRU_TEST;
 
+//发送信息请求
 typedef struct STRU_SENDMSG_RQ
 {
     STRU_SENDMSG_RQ()
@@ -276,4 +297,64 @@ typedef struct STRU_OFFLINE_RQ
     PackType m_nType;
     int m_userid;
 }STRU_OFFLINE_RQ;
+
+//上传文件请求
+typedef struct STRU_UPLOAD_RQ
+{
+    STRU_UPLOAD_RQ()
+    {
+        m_nType = DEF_PACK_UPLOAD_RQ;
+        m_UserId = 0;
+        m_friendId = 0;
+        m_nFileSize = 0;
+        memset( m_szFileMD5 , 0 , MAX_SIZE);
+        memset(m_szFileName , 0 ,MAX_PATH);
+    }
+    PackType m_nType; //包类型
+    int m_UserId; //用于查数据库, 获取用户名字, 拼接路径
+    int m_friendId; //对方的id
+
+    int64_t m_nFileSize; //文件大小, 用于文件传输结束
+    char m_szFileMD5[MAX_SIZE];
+    char m_szFileName[MAX_PATH]; //文件名, 用于存储文件
+
+}STRU_UPLOAD_RQ;
+
+//上传文件请求回复
+typedef struct STRU_UPLOAD_RS
+{
+    STRU_UPLOAD_RS()
+    {
+        m_nType = DEF_PACK_UPLOAD_RS;
+        m_UserId= 0 ;
+        m_friendId = 0;
+        memset( m_szFileMD5 , 0 , MAX_SIZE);
+        m_nResult = 0;
+    }
+    PackType m_nType; //包类型
+    int m_nResult;
+    int m_UserId; //用于查数据库, 获取用户名字, 拼接路径
+    int m_friendId; //对方的id
+    char m_szFileMD5[MAX_SIZE];
+}STRU_UPLOAD_RS;
+
+//文件块请求
+typedef struct STRU_FILEBLOCK_RQ
+{
+    STRU_FILEBLOCK_RQ()
+    {
+        m_nType = DEF_PACK_FILEBLOCK_RQ;
+        m_nUserId = 0;
+        m_friendId = 0;
+        memset( m_szFileMD5 , 0 , MAX_SIZE);
+        m_nBlockLen =0;
+        memset(m_szFileContent, 0 , MAX_CONTENT_LEN);
+    }
+    PackType m_nType; //包类型
+    int m_nUserId; //用户 ID
+    int m_friendId; //对方的id
+    char m_szFileMD5[MAX_SIZE]; // 文件块身份标识
+    int m_nBlockLen; //文件写入大小
+    char m_szFileContent[MAX_CONTENT_LEN];
+}STRU_FILEBLOCK_RQ;
 #endif

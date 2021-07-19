@@ -21,6 +21,9 @@ static const ProtocolMap m_ProtocolMapEntries[] =
     {DEF_PACK_ADDFRIEND_RS,&TcpKernel::AddFriend},
     {DEF_PACK_SENDMSG_RQ,&TcpKernel::RepeatMsg},
     {DEF_PACK_OFFLINE_RQ,&TcpKernel::OffLine},
+    {DEF_PACK_UPLOAD_RQ,&TcpKernel::GetFileMSG},
+    {DEF_PACK_FILEBLOCK_RQ,&TcpKernel::GetFileBlock},
+    {DEF_PACK_UPLOAD_RS,&TcpKernel::SendFileBlock},
     {DEF_PACK_TEST,&TcpKernel::Test},
     {0,0}
 };
@@ -72,6 +75,8 @@ void TcpKernel::DealData(int clientfd,char *szbuf,int nlen)
         if(*pType == m_ProtocolMapEntries[i].m_type)
         {
             PFUN fun= m_ProtocolMapEntries[i].m_pfun;
+            if(fun == 0)
+                return ;
             (this->*fun)(clientfd,szbuf,nlen);
         }
         else if(m_ProtocolMapEntries[i].m_type == 0 &&
@@ -357,6 +362,156 @@ void TcpKernel::RepeatMsg(int clientfd, char *szbuf, int nlen)
         }
     }
 }
+//获取文件信息
+void TcpKernel::GetFileMSG(int clientfd, char *szbuf, int nlen)
+{
+    STRU_UPLOAD_RQ *rq = (STRU_UPLOAD_RQ*)szbuf;
+    STRU_UPLOAD_RS rs;
+    STRU_FILE_INFO * info = new STRU_FILE_INFO;
+    strcpy(info->fileMd5,rq->m_szFileMD5);
+    strcpy(info->fileName,rq->m_szFileName);
+    info->filePos = 0;
+    info->fileSize = rq->m_nFileSize;
+    sprintf(info->filePath,"/home/hush/tmpFile/%s",rq->m_szFileName);
+    info->pFile = fopen(info->filePath,"a");
+
+    string Md5str = info->fileMd5;
+    map_Md5ToFileinfo[Md5str] = info;
+
+    rs.m_UserId = rq->m_UserId;
+    rs.m_nResult = 1;
+    rs.m_friendId = rq->m_friendId;
+    strcpy(rs.m_szFileMD5,info->fileMd5);
+    if(info->pFile == NULL)
+        rs.m_nResult = 0;
+    m_tcp->SendData(clientfd,(char *)&rs,sizeof(rs));
+
+}
+
+void TcpKernel::GetFileBlock(int clientfd, char *szbuf, int nlen)
+{
+    STRU_FILEBLOCK_RQ *rq = (STRU_FILEBLOCK_RQ*)szbuf;
+    string Md5 = rq->m_szFileMD5;
+    if(map_Md5ToFileinfo.find(Md5) != map_Md5ToFileinfo.end())
+    {
+        STRU_FILE_INFO * info = map_Md5ToFileinfo[Md5];
+
+        int res = fwrite(rq->m_szFileContent,1,rq->m_nBlockLen,info->pFile);
+        info->filePos += res;
+        if(info->filePos>=info->fileSize)
+        {
+            fclose(info->pFile);
+            //开始向目标发送文件头
+            printf("finsh\n");
+            STRU_UPLOAD_RQ urq;
+            urq.m_UserId = rq->m_nUserId;
+            urq.m_friendId = rq->m_friendId;
+            strcpy(urq.m_szFileMD5,rq->m_szFileMD5);
+            strcpy(urq.m_szFileName,info->fileName);
+            urq.m_nFileSize = info->fileSize;
+            if(m_mapIdtoUserInfo.find(urq.m_friendId)!=m_mapIdtoUserInfo.end())
+            {
+                int sockfd = m_mapIdtoUserInfo[urq.m_friendId]->sock_fd;
+                m_tcp->SendData(sockfd,(char *)&urq,sizeof(urq));
+            }
+            else
+            {
+                char szsql[_DEF_SQLIEN] = {0};
+                sprintf(szsql,"insert into t_OffFile values(%d,%d,'%s','%s',%ld,'%s');",urq.m_friendId,urq.m_UserId,info->filePath,info->fileName,info->fileSize,info->fileMd5);
+                if(!m_sql->UpdataMysql(szsql))
+                {
+                    printf("szsql error:%s",szsql);
+                    return ;
+                }
+                pthread_mutex_lock(&lock);
+                auto ite = map_Md5ToFileinfo.find(Md5);
+                map_Md5ToFileinfo.erase(ite);
+                delete info;
+                info = NULL;
+                pthread_mutex_unlock(&lock);
+            }
+
+        }
+    }
+}
+
+void TcpKernel::SendFileBlock(int clientfd, char *szbuf, int nlen)
+{
+    STRU_UPLOAD_RS *rs = (STRU_UPLOAD_RS*)szbuf;
+    STRU_FILEBLOCK_RQ rq;
+    STRU_FILE_INFO *info = NULL;
+    rq.m_nUserId = rs->m_UserId;
+    rq.m_friendId = rs->m_friendId;
+    string md5 = rs->m_szFileMD5;
+    if(map_Md5ToFileinfo.find(md5)!=map_Md5ToFileinfo.end())
+       info = map_Md5ToFileinfo[md5];
+       if(rs->m_nResult == 0)
+       {
+           fclose(info->pFile);
+           pthread_mutex_lock(&lock);
+           string md5 = rs->m_szFileMD5;
+           auto ite = map_Md5ToFileinfo.find(md5);
+           if(ite != map_Md5ToFileinfo.end())
+           {
+               delete (*ite).second;
+               map_Md5ToFileinfo.erase(ite);
+
+           }
+           pthread_mutex_unlock(&lock);
+           return ;
+       }
+       else
+       {
+
+           info->pFile = fopen(info->filePath,"r");
+           info->filePos = 0;
+           int pos = 0;
+           int times = 0;
+
+              while(1)
+              {
+                  pos++;
+                  if(pos%500==0)
+                  {
+                      usleep(10000);
+                  }
+
+                  int res  = fread( rq.m_szFileContent , 1 , MAX_CONTENT_LEN ,info->pFile);
+                  strcpy( rq.m_szFileMD5  , info->fileMd5 );
+
+                  info->filePos += res ;
+                  rq.m_nBlockLen = res;
+                  while( m_tcp->SendData(clientfd, (char*)&rq , sizeof(rq) )== false)
+                     {
+                          usleep(100000);
+                          //判断时间
+                          times++;
+                          if(times == 20)
+                              return;
+                     }
+
+
+                  if( info->filePos >= info->fileSize )
+                  {
+                      fclose(info->pFile);
+                      pthread_mutex_lock(&lock);
+                      string md5 = rq.m_szFileMD5;
+                      auto ite = map_Md5ToFileinfo.find(md5);
+                      if(ite != map_Md5ToFileinfo.end())
+                      {
+                          delete (*ite).second;
+                          map_Md5ToFileinfo.erase(ite);
+
+                      }
+                      pthread_mutex_unlock(&lock);
+
+                          return ;
+                  }
+              }
+
+
+       }
+}
 //获取离线信息
 void TcpKernel::GetOffMsg(int clientfd, int user_id)
 {
@@ -419,6 +574,11 @@ void TcpKernel::OffLine(int clientfd, char *szbuf, int nlen)
     STRU_OFFLINE_RQ *rq = (STRU_OFFLINE_RQ*)szbuf;
     char szsql[_DEF_SQLIEN] = {0};
     sprintf(szsql,"update t_user set status = 0 where user_id = %d;",rq->m_userid);
+    if(!m_sql->UpdataMysql(szsql))
+    {
+        printf("sql error:%s\n");
+        return ;
+    }
     STRU_USER_INFO *info = NULL;
     pthread_mutex_lock(&lock);
     auto ite = m_mapIdtoUserInfo.find(rq->m_userid);

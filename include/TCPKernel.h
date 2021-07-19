@@ -57,6 +57,12 @@ public:
     //转发消息
     void RepeatMsg(int clientfd ,char* szbuf,int nlen);
 
+    //接受文件头
+    void GetFileMSG(int clientfd ,char* szbuf,int nlen);
+    //接受文件块
+    void GetFileBlock(int clientfd ,char* szbuf,int nlen);
+    //发送文件块
+    void SendFileBlock(int clientfd ,char* szbuf,int nlen);
     //获取离线信息
     void GetOffMsg(int clientfd,int user_id);
 
@@ -69,6 +75,7 @@ public:
     CMysql * m_sql;
     TcpNet * m_tcp;
     unordered_map<int,UserInfo_S*> m_mapIdtoUserInfo;
+    unordered_map<string,STRU_FILE_INFO*> map_Md5ToFileinfo;
     pthread_mutex_t lock;
 };
 
