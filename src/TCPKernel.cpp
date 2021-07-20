@@ -24,6 +24,7 @@ static const ProtocolMap m_ProtocolMapEntries[] =
     {DEF_PACK_UPLOAD_RQ,&TcpKernel::GetFileMSG},
     {DEF_PACK_FILEBLOCK_RQ,&TcpKernel::GetFileBlock},
     {DEF_PACK_UPLOAD_RS,&TcpKernel::SendFileBlock},
+    {DEF_PACK_DEL_FRIEND_RQ,&TcpKernel::DelFriendRq},
     {DEF_PACK_TEST,&TcpKernel::Test},
     {0,0}
 };
@@ -360,6 +361,36 @@ void TcpKernel::RepeatMsg(int clientfd, char *szbuf, int nlen)
           printf("sql error:%s\n");
           return ;
         }
+    }
+}
+
+void TcpKernel::DelFriendRq(int clientfd, char *szbuf, int nlen)
+{
+    STRU_DELFRIEND_RQ *rq = (STRU_DELFRIEND_RQ *)szbuf;
+    STRU_DELFRIEND_RS rs;
+    rs.del_userid = rq->m_frid;
+    char szsql[_DEF_SQLIEN] = {0};
+    list<string> ls;
+    sprintf(szsql,"select * from t_friend where user_id = %d and friend_id = %d;",rq->m_userid,rq->m_frid);
+    if(!m_sql->SelectMysql(szsql,2,ls))
+    {
+        printf("szsql error:%S\n",szsql);
+        return ;
+    }
+    if(ls.size()==0)
+        return ;
+    bzero(szsql,sizeof (szsql));
+    sprintf(szsql,"delete from t_friend where user_id = %d and friend_id = %d;",rq->m_frid,rq->m_userid);
+    if(!m_sql->UpdataMysql(szsql))
+    {
+        printf("szsql error:%S\n",szsql);
+        return ;
+    }
+    m_tcp->SendData(clientfd,(char *)&rs,sizeof(rs));
+    if(m_mapIdtoUserInfo.find(rq->m_frid)!=m_mapIdtoUserInfo.end())
+    {
+        rs.del_userid = rq->m_userid;
+        m_tcp->SendData(m_mapIdtoUserInfo[rq->m_frid]->sock_fd,(char*)&rs,sizeof (rs));
     }
 }
 //获取文件信息

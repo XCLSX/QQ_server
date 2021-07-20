@@ -56,7 +56,8 @@ public:
     void PostFriList(int,int);
     //转发消息
     void RepeatMsg(int clientfd ,char* szbuf,int nlen);
-
+    //删除好友
+    void DelFriendRq(int clientfd ,char* szbuf,int nlen);
     //接受文件头
     void GetFileMSG(int clientfd ,char* szbuf,int nlen);
     //接受文件块
