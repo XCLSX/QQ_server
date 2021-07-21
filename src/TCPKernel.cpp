@@ -25,10 +25,10 @@ static const ProtocolMap m_ProtocolMapEntries[] =
     {DEF_PACK_FILEBLOCK_RQ,&TcpKernel::GetFileBlock},
     {DEF_PACK_UPLOAD_RS,&TcpKernel::SendFileBlock},
     {DEF_PACK_DEL_FRIEND_RQ,&TcpKernel::DelFriendRq},
+    {DEF_PACK_ALTER_USERINFO_RQ,&TcpKernel::AlterUserInfo},
     {DEF_PACK_TEST,&TcpKernel::Test},
     {0,0}
 };
-#define RootPath   "/home/colin/Video/"
 
 int TcpKernel::Open()
 {
@@ -596,6 +596,53 @@ void TcpKernel::GetOffMsg(int clientfd, int user_id)
     {
         printf("sql error:%s\n",szsql);
         return;
+    }
+
+}
+
+void TcpKernel::AlterUserInfo(int clientfd, char *szbuf, int nlen)
+{
+    STRU_ALTER_USERINFO_RQ *rq = (STRU_ALTER_USERINFO_RQ*)szbuf;
+    STRU_ALTER_USERINFO_RS rs;
+    rs.m_iconid = rq->m_iconid;
+    strcpy(rs.m_szName,rq->m_szName);
+    strcpy(rs.m_szFeeling,rq->m_szFeeling);
+    char szsql[_DEF_SQLIEN] = {0};
+    sprintf(szsql,"update t_user set user_name =  '%s', felling = '%s', icon_id = %d where user_id = %d;",rq->m_szName,rq->m_szFeeling,rq->m_iconid,rq->m_userid);
+    if(!m_sql->UpdataMysql(szsql))
+    {
+        printf("sql error:%s\n");
+        return ;
+    }
+    m_tcp->SendData(clientfd,(char *)&rs,sizeof(rs));
+    //为所有在线好友更新信息
+    STRU_UPDATE_STATUS sus;
+    sus.m_UserInfo.m_status = 1;
+    sus.m_UserInfo.m_icon_id = rq->m_iconid;
+    sus.m_UserInfo.m_user_id = rq->m_userid;
+    strcpy(sus.m_UserInfo.m_userName,rq->m_szName);
+    strcpy(sus.m_UserInfo.sz_feeling,rq->m_szFeeling);
+    sus.m_UserInfo.m_userAccount[0] = 0;
+
+    bzero(szsql,sizeof(szsql));
+    sprintf(szsql,"select friend_id from t_friend where user_id = %d;",rq->m_userid);
+    list<string> ls;
+    if(!m_sql->SelectMysql(szsql,1,ls))
+    {
+        printf("sql error:%s\n",szsql);
+        return;
+    }
+    for(int i=0;i<ls.size();i++)
+    {
+        auto ite = m_mapIdtoUserInfo.find(atoi(ls.front().c_str()));
+        if(ite == m_mapIdtoUserInfo.end())
+        {
+            ls.pop_front();
+            continue;
+        }
+        int sockfd = (*ite).second->sock_fd;
+        m_tcp->SendData(sockfd,(char *)&sus,sizeof (sus));
+        ls.pop_front();
     }
 
 }

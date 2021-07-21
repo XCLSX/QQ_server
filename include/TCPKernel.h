@@ -66,7 +66,7 @@ public:
     void SendFileBlock(int clientfd ,char* szbuf,int nlen);
     //获取离线信息
     void GetOffMsg(int clientfd,int user_id);
-
+    void AlterUserInfo(int clientfd ,char* szbuf,int nlen);
     //下线
     void OffLine(int clientfd ,char* szbuf,int nlen);
     void Test(int clientfd ,char* szbuf,int nlen);
