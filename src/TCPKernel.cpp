@@ -35,6 +35,7 @@ int TcpKernel::Open()
     pthread_mutex_init(&lock,NULL);
     m_sql = new CMysql;
     m_tcp = new TcpNet(this);
+    m_redis = new RedisTool;
     m_tcp->SetpThis(m_tcp);
     pthread_mutex_init(&m_tcp->alock,NULL);
     pthread_mutex_init(&m_tcp->rlock,NULL);

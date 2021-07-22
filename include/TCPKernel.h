@@ -6,6 +6,7 @@
 #include "TCPNet.h"
 #include "Mysql.h"
 #include <packdef.h>
+#include <redis/RedisTools.h>
 class TcpKernel;
 typedef void (TcpKernel::*PFUN)(int,char*,int nlen);
 
@@ -75,6 +76,7 @@ public:
  private:
     CMysql * m_sql;
     TcpNet * m_tcp;
+    RedisTool *m_redis;
     unordered_map<int,UserInfo_S*> m_mapIdtoUserInfo;
     unordered_map<string,STRU_FILE_INFO*> map_Md5ToFileinfo;
     pthread_mutex_t lock;
