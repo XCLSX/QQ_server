@@ -64,6 +64,7 @@ int TcpKernel::Open()
 void TcpKernel::Close()
 {
     m_sql->DisConnect();
+    m_redis->ExitRedis();
     m_tcp->UnInitNetWork();
 }
 
@@ -198,13 +199,15 @@ void TcpKernel::Login(int clientfd ,char* szbuf,int nlen)
             rs.m_userInfo.m_user_id = user_id;
 
             //录入映射
+            if(rs.m_userInfo.sz_feeling[0] == 0)
+                sprintf(rs.m_userInfo.sz_feeling,"\"11\"");
+            string key_redis = "qq-user-"+to_string(user_id);
+            string fields_redis = "user_id "+to_string(user_id)+" sockfd "+to_string(clientfd)+
+                    " icon_id "+to_string(rs.m_userInfo.m_icon_id)+" user_name "+rs.m_userInfo.m_userName
+                    +" feeling "+rs.m_userInfo.sz_feeling;
 
-            char redis_str[_DEF_SQLIEN] = {0};
-            sprintf(redis_str,"user_id %d sockfd %d icon_id %d user_name '%s' feeling '%s'",
-                    rs.m_userInfo.m_user_id,clientfd,rs.m_userInfo.m_icon_id,rs.m_userInfo.m_userName,rs.m_userInfo.sz_feeling);
-            char key[_DEF_SQLIEN] = {0};
-            sprintf(key,"qq-user-%d",user_id);
-            m_redis->SetmHashValue(string(key),string(redis_str));
+            if(!m_redis->SetmHashValue(key_redis,fields_redis))
+                return ;
         }
 
         m_tcp->SendData( clientfd , (char*)&rs , sizeof(rs) );
@@ -227,8 +230,8 @@ void TcpKernel::Login(int clientfd ,char* szbuf,int nlen)
         sus.m_UserInfo.m_status = 1;
         for(int i=0;i<ls.size();i++)
         {
-            char redis_key[_DEF_SQLIEN] = {0};
-            sprintf(redis_key,"qq-user-%d",atoi(ls.front().c_str()));   ls.pop_front();
+
+            string redis_key = "qq-user-"+ls.front();                    ls.pop_front();
             string str;
             str = m_redis->GetHashValue(redis_key,string("sockfd"));
             if(str.size()==0)
@@ -237,18 +240,6 @@ void TcpKernel::Login(int clientfd ,char* szbuf,int nlen)
             m_tcp->SendData(sockfd,(char *)&sus,sizeof(sus));
 
         }
-//        for(int i=0;i<ls.size();i++)
-//        {
-//            auto ite = m_mapIdtoUserInfo.find(atoi(ls.front().c_str()));
-//            if(ite == m_mapIdtoUserInfo.end())
-//            {
-//                ls.pop_front();
-//                continue;
-//            }
-//            int sockfd = (*ite).second->sock_fd;
-//            m_tcp->SendData(sockfd,(char *)&sus,sizeof (sus));
-//            ls.pop_front();
-//        }
 }
 
 //查找好友
@@ -283,10 +274,13 @@ void TcpKernel::RepeatFriendRq(int clientfd ,char* szbuf,int nlen)
 {
     STRU_ADDFRIEND_RQ *rq = (STRU_ADDFRIEND_RQ*)szbuf;
     //在线
-    if(m_mapIdtoUserInfo.find(rq->m_frid)!=m_mapIdtoUserInfo.end())
+    string key_str = "qq-user-"+to_string(rq->m_frid);
+    string sockstr = m_redis->GetHashValue(key_str,string("sockfd"));
+    if(sockstr.size()>0)
     {
-        int sockfd = m_mapIdtoUserInfo[rq->m_frid]->sock_fd;
+        int sockfd = atoi(sockstr.c_str());
         m_tcp->SendData(sockfd,szbuf,nlen);
+
     }
     //离线
     else
@@ -326,10 +320,21 @@ void TcpKernel::AddFriend(int clientfd ,char* szbuf,int nlen)
     STRU_UPDATE_STATUS sus;
 
     sus.m_UserInfo = *GetUserInfo(rs->m_frid);
-    m_tcp->SendData(m_mapIdtoUserInfo[rs->m_userid]->sock_fd,(char *)&sus,sizeof(sus));
-
+    string key_str = "qq-user-"+to_string(rs->m_userid);
+    string sockstr = m_redis->GetHashValue(key_str,string("sockfd"));
+    if(sockstr.size()>0)
+    {
+        int sockfd = atoi(sockstr.c_str());
+        m_tcp->SendData(sockfd,(char *)&sus,sizeof(sus));
+    }
     sus.m_UserInfo = *GetUserInfo(rs->m_userid);
-    m_tcp->SendData(m_mapIdtoUserInfo[rs->m_frid]->sock_fd,(char *)&sus,sizeof(sus));
+    key_str = "qq-user-"+to_string(rs->m_frid);
+    sockstr = m_redis->GetHashValue(key_str,string("sockfd"));
+    if(sockstr.size()>0)
+    {
+        int sockfd = atoi(sockstr.c_str());
+        m_tcp->SendData(sockfd,(char *)&sus,sizeof(sus));
+    }
 }
 //发送好友列表
 void TcpKernel::PostFriList(int clientfd,int userid)
@@ -363,9 +368,13 @@ void TcpKernel::PostFriList(int clientfd,int userid)
 void TcpKernel::RepeatMsg(int clientfd, char *szbuf, int nlen)
 {
     STRU_SENDMSG_RQ *rq = (STRU_SENDMSG_RQ*)szbuf;
-    if(m_mapIdtoUserInfo.find(rq->m_Touserid)!=m_mapIdtoUserInfo.end())
+    string key_str = "qq-user-"+to_string(rq->m_Touserid);
+    string sockstr = m_redis->GetHashValue(key_str,string("sockfd"));
+    if(sockstr.size()>0)
     {
-        m_tcp->SendData(m_mapIdtoUserInfo[rq->m_Touserid]->sock_fd,szbuf,nlen);
+        int sockfd = atoi(sockstr.c_str());
+        m_tcp->SendData(sockfd,szbuf,nlen);
+
     }
     else
     {
@@ -403,10 +412,12 @@ void TcpKernel::DelFriendRq(int clientfd, char *szbuf, int nlen)
         return ;
     }
     m_tcp->SendData(clientfd,(char *)&rs,sizeof(rs));
-    if(m_mapIdtoUserInfo.find(rq->m_frid)!=m_mapIdtoUserInfo.end())
+    string key_str = "qq-user-"+to_string(rq->m_frid);
+    string sockstr = m_redis->GetHashValue(key_str,string("sockfd"));
+    if(sockstr.size()>0)
     {
-        rs.del_userid = rq->m_userid;
-        m_tcp->SendData(m_mapIdtoUserInfo[rq->m_frid]->sock_fd,(char*)&rs,sizeof (rs));
+        int sockfd = atoi(sockstr.c_str());
+        m_tcp->SendData(sockfd,(char*)&rs,sizeof (rs));
     }
 }
 //获取文件信息
@@ -456,9 +467,11 @@ void TcpKernel::GetFileBlock(int clientfd, char *szbuf, int nlen)
             strcpy(urq.m_szFileMD5,rq->m_szFileMD5);
             strcpy(urq.m_szFileName,info->fileName);
             urq.m_nFileSize = info->fileSize;
-            if(m_mapIdtoUserInfo.find(urq.m_friendId)!=m_mapIdtoUserInfo.end())
+            string key_str = "qq-user-"+to_string(urq.m_friendId);
+            string sockstr = m_redis->GetHashValue(key_str,string("sockfd"));
+            if(sockstr.size()>0)
             {
-                int sockfd = m_mapIdtoUserInfo[urq.m_friendId]->sock_fd;
+                int sockfd = atoi(sockstr.c_str());
                 m_tcp->SendData(sockfd,(char *)&urq,sizeof(urq));
             }
             else
@@ -481,7 +494,7 @@ void TcpKernel::GetFileBlock(int clientfd, char *szbuf, int nlen)
         }
     }
 }
-
+//发送文件快
 void TcpKernel::SendFileBlock(int clientfd, char *szbuf, int nlen)
 {
     STRU_UPLOAD_RS *rs = (STRU_UPLOAD_RS*)szbuf;
@@ -615,7 +628,7 @@ void TcpKernel::GetOffMsg(int clientfd, int user_id)
     }
 
 }
-
+//修改个人信息
 void TcpKernel::AlterUserInfo(int clientfd, char *szbuf, int nlen)
 {
     STRU_ALTER_USERINFO_RQ *rq = (STRU_ALTER_USERINFO_RQ*)szbuf;
@@ -650,19 +663,17 @@ void TcpKernel::AlterUserInfo(int clientfd, char *szbuf, int nlen)
     }
     for(int i=0;i<ls.size();i++)
     {
-        auto ite = m_mapIdtoUserInfo.find(atoi(ls.front().c_str()));
-        if(ite == m_mapIdtoUserInfo.end())
+        string key_str = "qq-user-"+ls.front();         ls.pop_front();
+        string sockstr = m_redis->GetHashValue(key_str,string("sockfd"));
+        if(sockstr.size()>0)
         {
-            ls.pop_front();
-            continue;
+            int sockfd = atoi(sockstr.c_str());
+            m_tcp->SendData(sockfd,(char *)&sus,sizeof (sus));
         }
-        int sockfd = (*ite).second->sock_fd;
-        m_tcp->SendData(sockfd,(char *)&sus,sizeof (sus));
-        ls.pop_front();
     }
 
 }
-
+//下线
 void TcpKernel::OffLine(int clientfd, char *szbuf, int nlen)
 {
     STRU_OFFLINE_RQ *rq = (STRU_OFFLINE_RQ*)szbuf;
@@ -673,19 +684,12 @@ void TcpKernel::OffLine(int clientfd, char *szbuf, int nlen)
         printf("sql error:%s\n");
         return ;
     }
-    STRU_USER_INFO *info = NULL;
-    pthread_mutex_lock(&lock);
-    auto ite = m_mapIdtoUserInfo.find(rq->m_userid);
-    if(ite == m_mapIdtoUserInfo.end())
-    {
-        pthread_mutex_unlock(&lock);
-        return ;
-    }
-    info = Info_sToInfo((*ite).second);
-    delete (*ite).second;
-    (*ite).second = NULL;
-    m_mapIdtoUserInfo.erase(ite);
-    pthread_mutex_unlock(&lock);
+
+    STRU_USER_INFO *info = GetOnlineUserInfo(rq->m_userid);
+    string key = "qq-user-"+to_string(rq->m_userid);
+    m_redis->RemoveKey(key);
+
+    //通知好友下线
     bzero(szsql,sizeof(szsql));
     sprintf(szsql,"select friend_id from t_friend where user_id = %d;",rq->m_userid);
     list<string> ls;
@@ -699,15 +703,14 @@ void TcpKernel::OffLine(int clientfd, char *szbuf, int nlen)
     sus.m_UserInfo.m_status = 0;
     for(int i=0;i<ls.size();i++)
     {
-        auto ite = m_mapIdtoUserInfo.find(atoi(ls.front().c_str()));
-        if(ite == m_mapIdtoUserInfo.end())
+        string key_str = "qq-user-"+ls.front();         ls.pop_front();
+        string sockstr = m_redis->GetHashValue(key_str,string("sockfd"));
+        if(sockstr.size()>0)
         {
-            ls.pop_front();
-            continue;
+            int sockfd = atoi(sockstr.c_str());
+            m_tcp->SendData(sockfd,(char *)&sus,sizeof (sus));
         }
-        int sockfd = (*ite).second->sock_fd;
-        m_tcp->SendData(sockfd,(char *)&sus,sizeof (sus));
-        ls.pop_front();
+
     }
 
 }
@@ -725,6 +728,21 @@ STRU_USER_INFO *TcpKernel::Info_sToInfo(UserInfo_S *info_s)
     info->m_user_id = info_s->m_user_id;
     strcpy(info->m_userName,info_s->m_szName);
     strcpy(info->sz_feeling,info_s->m_szfelling);
+    return info;
+}
+
+STRU_USER_INFO *TcpKernel::GetOnlineUserInfo(int user_id)
+{
+    string key_str = "qq-user-"+to_string(user_id);
+    list<string> ls;
+    ls = m_redis->GetHashAllValue(key_str);
+    if(ls.size() == 0)
+        return NULL;
+    STRU_USER_INFO *info = new STRU_USER_INFO;
+    info->m_user_id = user_id; ls.pop_front();      ls.pop_front();    //跳过user_id 和 sockfd
+    info->m_icon_id = atoi(ls.front().c_str());     ls.pop_front();
+    strcpy(info->m_userName,ls.front().c_str());    ls.pop_front();
+    strcpy(info->sz_feeling,ls.front().c_str());    ls.pop_front();
     return info;
 }
 

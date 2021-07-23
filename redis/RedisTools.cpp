@@ -468,3 +468,21 @@ int RedisTool::isHashKeyExists(string key )
         return 1;
     }
 }
+
+void RedisTool::ExitRedis()
+{
+    if(m_redis == NULL || m_redis->err)
+    {
+        cout << "Redis init Error !!!" << endl;
+        init();
+        return ;
+    }
+    redisReply *reply;
+    reply = (redisReply *)redisCommand(m_redis,"SHUTDOWN NOSAVE");
+    redisFree(m_redis);
+    m_redis = NULL;
+    freeReplyObject(reply);
+
+    return ;
+
+}

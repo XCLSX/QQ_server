@@ -27,6 +27,7 @@ public:
     list<string> GetmHashValue(string key,string fields,int field_len);
     list<string> GetHashAllValue(string key);
     int isHashKeyExists(string key );
+    void ExitRedis();
 private:
     void init();
     redisContext *m_redis;

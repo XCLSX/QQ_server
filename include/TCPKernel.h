@@ -73,11 +73,11 @@ public:
     void Test(int clientfd ,char* szbuf,int nlen);
 
     STRU_USER_INFO* Info_sToInfo(UserInfo_S*);
+    STRU_USER_INFO *GetOnlineUserInfo(int user_id);
  private:
     CMysql * m_sql;
     TcpNet * m_tcp;
     RedisTool *m_redis;
-    unordered_map<int,UserInfo_S*> m_mapIdtoUserInfo;
     unordered_map<string,STRU_FILE_INFO*> map_Md5ToFileinfo;
     pthread_mutex_t lock;
 };
