@@ -329,25 +329,24 @@ string  RedisTool::GetHashValue(string key,string field )
     return "";
 }
 
-void RedisTool::SetmHashValue(string Key, string fields)
+bool RedisTool::SetmHashValue(string Key, string fields)
 {
     if(m_redis == NULL || m_redis->err)
     {
         cout << "Redis init Error !!!" << endl;
         init();
-        return;
+        return false;
     }
 
     redisReply *reply;
 
     string temp = "hmset "+Key+" "+fields;
     reply = (redisReply*)redisCommand(m_redis,temp.c_str());
-//        cout<<"Set Hash type = "<<reply->type<<" ";
-
+    if(strcmp(reply->str,"OK") !=0 )
+        return false;
 
     freeReplyObject(reply);
-    cout<<"Set Hash success"<<endl;
-    return;
+    return true;
 }
 
 list<string> RedisTool::GetmHashValue(string key,string fields,int field_len)
@@ -381,6 +380,52 @@ list<string> RedisTool::GetmHashValue(string key,string fields,int field_len)
         list<string> res;
         redisReply** replyVector = reply->element;
         for(int i=0;i<field_len;i++)
+        {
+            stringstream ss;
+            ss << (*replyVector)->str;
+            res.push_back(ss.str());
+            replyVector++;
+        }
+
+        freeReplyObject(reply);
+
+        return res;
+    }
+    return {};
+}
+
+list<string> RedisTool::GetHashAllValue(string key)
+{
+    if(m_redis == NULL || m_redis->err)
+    {
+        cout << "Redis init Error !!!" << endl;
+        init();
+        return {};
+    }
+    redisReply *reply;
+    int times = 0;
+    string temp = "hlen "+key;
+    reply = (redisReply *)redisCommand(m_redis,temp.c_str());
+    times = reply->integer;
+    temp = "hvals "+key;
+    reply = (redisReply *)redisCommand(m_redis,temp.c_str());
+
+    if(reply == NULL)
+    {
+        redisFree(m_redis);
+        m_redis = NULL;
+        cout << "ERROR getString: reply = NULL!!!!!!!!!!!! maybe redis server is down" << endl;
+
+    }
+    else if(times<=0)
+    {
+        freeReplyObject(reply);
+    }
+    else
+    {
+        list<string> res;
+        redisReply** replyVector = reply->element;
+        for(int i=0;i<times;i++)
         {
             stringstream ss;
             ss << (*replyVector)->str;

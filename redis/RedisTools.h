@@ -23,8 +23,9 @@ public:
 
     void SetHashValue(string key,string field , string value);
     string GetHashValue(string key,string field );
-    void SetmHashValue(string Key,string fields);
+    bool SetmHashValue(string Key,string fields);
     list<string> GetmHashValue(string key,string fields,int field_len);
+    list<string> GetHashAllValue(string key);
     int isHashKeyExists(string key );
 private:
     void init();

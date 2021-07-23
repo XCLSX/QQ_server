@@ -15,7 +15,8 @@ SOURCES += \
         src/TCPNet.cpp \
         src/Thread_pool.cpp \
         src/err_str.cpp \
-        src/main.cpp
+        src/main.cpp \
+        src/temp.cpp
 
 HEADERS += \
     include/Mysql.h \
