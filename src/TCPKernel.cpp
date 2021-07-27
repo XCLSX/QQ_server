@@ -26,6 +26,8 @@ static const ProtocolMap m_ProtocolMapEntries[] =
     {DEF_PACK_UPLOAD_RS,&TcpKernel::SendFileBlock},
     {DEF_PACK_DEL_FRIEND_RQ,&TcpKernel::DelFriendRq},
     {DEF_PACK_ALTER_USERINFO_RQ,&TcpKernel::AlterUserInfo},
+    {DEF_PACK_CREATEGROUP_RQ,&TcpKernel::CreateGroup},
+    {DEF_PACK_SENDGROUPMSG_RS,&TcpKernel::SendGroupMsg},
     {DEF_PACK_TEST,&TcpKernel::Test},
     {0,0}
 };
@@ -214,7 +216,7 @@ void TcpKernel::Login(int clientfd ,char* szbuf,int nlen)
 
         //发送好友列表
         PostFriList(clientfd,rs.m_userInfo.m_user_id);
-
+        //获取离线信息
         GetOffMsg(clientfd,rs.m_userInfo.m_user_id);
 
         //通知好友上线
@@ -626,6 +628,59 @@ void TcpKernel::GetOffMsg(int clientfd, int user_id)
         printf("sql error:%s\n",szsql);
         return;
     }
+    //获取群信息
+    ls.clear();
+    STRU_GET_GROUP_INFO_RQ ggiq;
+    bzero(szsql,sizeof(szsql));
+    sprintf(szsql,"select group_id from t_group where user_id = %d;",user_id);
+    if(!m_sql->SelectMysql(szsql,1,ls))
+    {
+        printf("sql error:%s\n",szsql);
+        return;
+    }
+    auto ite = ls.begin();
+    while(ite!=ls.end())
+    {
+        //获取群信息
+        int group_id = atoi((*ite).c_str());
+        list<string> templs;
+        bzero(szsql,sizeof(szsql));
+        sprintf(szsql,"select group_name,group_iconid from t_groupInfo where group_id = %d;",group_id);
+        if(!m_sql->SelectMysql(szsql,2,templs))
+        {
+            printf("sql error:%s\n",szsql);
+            return;
+        }
+        ggiq.m_groupid = group_id;
+        strcpy(ggiq.m_szGroupName,templs.front().c_str());           templs.pop_front();
+        ggiq.m_iconid = atoi(templs.front().c_str());
+        //获取群成员信息
+        bzero(szsql,sizeof(szsql));
+        templs.clear();
+        sprintf(szsql,"select * from t_group inner join t_user on t_group.user_id = t_user.user_id where group_id = %d;",ggiq.m_groupid);
+        if(!m_sql->SelectMysql(szsql,10,templs))
+        {
+            printf("sql error:%s\n",szsql);
+            return;
+        }
+        STRU_USER_INFO info;
+        for(int i=0;i<templs.size();i++)
+        {
+            templs.pop_front();
+            info.m_user_id = atoi(templs.front().c_str());      templs.pop_front();
+            ggiq.rightarr[i] = atoi(templs.front().c_str());    templs.pop_front();     templs.pop_front();
+            strcpy(info.m_userAccount,templs.front().c_str());  templs.pop_front();     templs.pop_front();
+            strcpy(info.m_userName,templs.front().c_str());     templs.pop_front();
+            info.m_icon_id = atoi(templs.front().c_str());      templs.pop_front();
+            info.m_status = atoi(templs.front().c_str());       templs.pop_front();
+            strcpy(info.sz_feeling,templs.front().c_str());     templs.pop_front();
+            ggiq.m_userInfo[i] = info;
+        }
+        m_tcp->SendData(clientfd,(char *)&ggiq,sizeof(ggiq));
+        memset(&ggiq,0,sizeof(ggiq));
+        ggiq.m_nType = DEF_PACK_GETGROUPINFO_RQ;
+        ++ite;
+    }
 
 }
 //修改个人信息
@@ -673,6 +728,65 @@ void TcpKernel::AlterUserInfo(int clientfd, char *szbuf, int nlen)
     }
 
 }
+//群聊
+void TcpKernel::CreateGroup(int clientfd, char *szbuf, int nlen)
+{
+    STRU_CREATE_GROUP_RQ *rq = (STRU_CREATE_GROUP_RQ*)szbuf;
+    STRU_CREATE_GROUP_RS rs;
+    char szsql[_DEF_SQLIEN] = {0};
+    sprintf(szsql,"insert into t_groupInfo values(null,'%s',1,%d,0);",rq->m_szGroupName,rq->m_userid);
+    if(!m_sql->UpdataMysql(szsql))
+    {
+        printf("sql error:%s\n",szsql);
+        return;
+    }
+    bzero(szsql,sizeof(szsql));
+    sprintf(szsql,"select group_id from t_groupInfo where group_name = '%s' and leader_id = %d;",rq->m_szGroupName,rq->m_userid);
+    list<string> ls;
+    if(!m_sql->SelectMysql(szsql,1,ls))
+    {
+        printf("sql error:%s\n",szsql);
+        return;
+    }
+    int group_id = atoi(ls.front().c_str());
+    bzero(szsql,sizeof(szsql));
+    sprintf(szsql,"insert into t_group values(%d,%d,0);",group_id,rq->m_userid);
+    if(!m_sql->UpdataMysql(szsql))
+    {
+        printf("sql error:%s\n",szsql);
+        return;
+    }
+
+    rs.m_groupid = group_id;
+    strcpy(rs.m_szGroupName,rq->m_szGroupName);
+    m_tcp->SendData(clientfd,(char *)&rs,sizeof(rs));
+}
+//转发群聊消息
+void TcpKernel::SendGroupMsg(int clientfd, char *szbuf, int nlen)
+{
+    STRU_SENDGROUPMSG_RQ *rq = (STRU_SENDGROUPMSG_RQ*)szbuf;
+    char szsql[_DEF_SQLIEN] = {0};
+    sprintf(szsql,"select user_id from t_group where group_id = %d;",rq->m_groupid);
+    list<string> ls;
+    if(!m_sql->SelectMysql(szsql,1,ls))
+    {
+        printf("sql error:%s\n",szsql);
+        return;
+    }
+    auto ite = ls.begin();
+    while(ite!=ls.end())
+    {
+
+        string key_str = "qq-user-"+*ite;
+        string sockstr = m_redis->GetHashValue(key_str,string("sockfd"));
+        if(sockstr.size()>0)
+        {
+            int sockfd = atoi(sockstr.c_str());
+            m_tcp->SendData(sockfd,szbuf,nlen);
+        }
+        ++ite;
+    }
+}
 //下线
 void TcpKernel::OffLine(int clientfd, char *szbuf, int nlen)
 {
@@ -710,8 +824,11 @@ void TcpKernel::OffLine(int clientfd, char *szbuf, int nlen)
             int sockfd = atoi(sockstr.c_str());
             m_tcp->SendData(sockfd,(char *)&sus,sizeof (sus));
         }
-
     }
+    char id[5] = {0};
+    sprintf(id,"%d",rq->m_userid);
+    string m_key = "qq-user-"+string(id);
+    m_redis->RemoveKey(m_key);
 
 }
 
