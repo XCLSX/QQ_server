@@ -28,6 +28,7 @@ static const ProtocolMap m_ProtocolMapEntries[] =
     {DEF_PACK_ALTER_USERINFO_RQ,&TcpKernel::AlterUserInfo},
     {DEF_PACK_CREATEGROUP_RQ,&TcpKernel::CreateGroup},
     {DEF_PACK_SENDGROUPMSG_RS,&TcpKernel::SendGroupMsg},
+    {DEF_PACK_GETHOT_POINT_RQ,&TcpKernel::GetHotLine},
     {DEF_PACK_TEST,&TcpKernel::Test},
     {0,0}
 };
@@ -786,6 +787,19 @@ void TcpKernel::SendGroupMsg(int clientfd, char *szbuf, int nlen)
         }
         ++ite;
     }
+}
+
+void TcpKernel::GetHotLine(int clientfd, char *szbuf, int nlen)
+{
+    STRU_GETHOTPOINT_RS rs;
+    WBSpider sp;
+    sp.work();
+    for(int i=0;i<50;i++)
+    {
+        strcpy(rs.m_hotres[i].sz_title,sp.vec_title[i].c_str());
+        strcpy(rs.m_hotres[i].sz_url,sp.vec_url[i].c_str());
+    }
+    m_tcp->SendData(clientfd,(char *)&rs,sizeof(rs));
 }
 //下线
 void TcpKernel::OffLine(int clientfd, char *szbuf, int nlen)

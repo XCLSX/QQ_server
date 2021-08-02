@@ -88,7 +88,7 @@ public:
     RedisTool *m_redis;
     unordered_map<string,STRU_FILE_INFO*> map_Md5ToFileinfo;
     pthread_mutex_t lock;
-    WBSpider sp;
+
 };
 
 

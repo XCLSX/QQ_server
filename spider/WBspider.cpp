@@ -5,7 +5,6 @@
 WBSpider::WBSpider()
 {
     webssl = NULL;
-
 }
 
 
@@ -151,26 +150,18 @@ ssl_t* WBSpider::create_ssl()
     return ssl;
 }
 
-int WBSpider::work(char *u)
+int WBSpider::work()
 {
        url_t *url = new url_t;
        memset(request,0,sizeof (request));
        url->filenames+="/home/hush/qtProject/";
-       url->srcul = u;
-       que_url.push(url);
-
-       while(que_url.size()>0)
-       {
-           url_t* temp = que_url.front();
-           que_url.pop();
-           spider_nat_init();
-           spider_url_analytical(url);
-           spider_connect(temp);
-           create_request(temp);
-           download(temp);
-           data_analytical(temp);
-       }
-
+       url->srcul = "https://s.weibo.com/top/summary";
+       spider_nat_init();
+       spider_url_analytical(url);
+       spider_connect(url);
+       create_request(url);
+       download(url);
+       data_analytical(url);
 }
 
 int WBSpider::data_analytical(url_t *u)
@@ -200,11 +191,11 @@ int WBSpider::data_analytical(url_t *u)
         vec_title.push_back(title);
         string url_temp = wb_begin+result[1].str()+wb_end;
         vec_url.push_back(url_temp);
-        cout<<i<<"  "<<title<<"  "<<url_temp<<endl;
+        //cout<<i<<"  "<<title<<"  "<<url_temp<<endl;
         iteStart = result[0].second;
         i++;
     }
-
+    return 1;
 
 }
 

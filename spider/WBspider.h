@@ -42,19 +42,15 @@ class WBSpider
 {
 public:
     WBSpider();
-    int work(char*u);
-
+    int work();
+    vector<string> vec_url;
+    vector<string> vec_title;
 private:
 
     char request[4096];
     int webfd;
     ssl_t *webssl;
-    queue<url_t*> que_used;
-    queue<url_t*> que_url;
-    list<string> titles;
-    list<string> url_net;
-    vector<string> vec_url;
-    vector<string> vec_title;
+
 
 private:
     int spider_nat_init();                          //网络初始化
