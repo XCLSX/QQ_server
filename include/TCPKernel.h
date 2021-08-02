@@ -7,6 +7,7 @@
 #include "Mysql.h"
 #include <packdef.h>
 #include <redis/RedisTools.h>
+#include <spider/WBspider.h>
 class TcpKernel;
 typedef void (TcpKernel::*PFUN)(int,char*,int nlen);
 
@@ -73,6 +74,8 @@ public:
     void CreateGroup(int clientfd ,char* szbuf,int nlen);
     //发送群聊信息
     void SendGroupMsg(int clientfd, char *szbuf, int nlen);
+    //获取热搜
+    void GetHotLine(int clientfd, char *szbuf, int nlen);
     //下线
     void OffLine(int clientfd ,char* szbuf,int nlen);
     void Test(int clientfd ,char* szbuf,int nlen);
@@ -85,6 +88,7 @@ public:
     RedisTool *m_redis;
     unordered_map<string,STRU_FILE_INFO*> map_Md5ToFileinfo;
     pthread_mutex_t lock;
+    WBSpider sp;
 };
 
 
