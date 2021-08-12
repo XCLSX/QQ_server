@@ -1,7 +1,7 @@
 #ifndef _TCPNET_H
 #define _TCPNET_H
 
-#include "Thread_pool.h"
+#include "thread_pool.h"
 #include "packdef.h"
 class IKernel
 {
@@ -20,7 +20,7 @@ public:
     int SendData(int,char*,int);
     void Addfd(int,int);
     void Deletefd(int);
-    void Epoll_Deal(int,pool_t*);
+    void Epoll_Deal(int);
 
     void SetpThis(TcpNet * tcp){ m_pThis = tcp ; }
 public:
@@ -35,7 +35,7 @@ public:
     struct sockaddr_in serveraddr;
     IKernel * m_kernel;
 
-    thread_pool * m_pool;
+    Mythread_pool * m_pool;
     static TcpNet * m_pThis;
 };
 

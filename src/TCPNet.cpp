@@ -4,8 +4,6 @@
 TcpNet * TcpNet::m_pThis = 0;
 int TcpNet::InitNetWork()
 {
-    pool_t *pool = NULL;
-    m_pool = new thread_pool;
     bzero(&serveraddr,sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
     if(inet_pton(AF_INET,_DEF_SERVERIP,&serveraddr.sin_addr.s_addr) == -1)
@@ -37,11 +35,11 @@ int TcpNet::InitNetWork()
     epfd = epoll_create(_DEF_EPOLLSIZE);//创建epoll的句柄，可以监听的文件描述符为_DEF_EPOLLSIZE
 
     Addfd(sockfd,TRUE);
-    //创建拥有10个线程的线程池 最大线程数100 环形队列最大值50
-    if((pool = (m_pool->Pool_create(200,10,50))) == NULL)
-        err_str("Create Thread_Pool Failed:",-1);
+    //创建拥有10个线程的线程池 最大线程数200 环形队列最大值50
+    m_pool = new Mythread_pool(10,200,50);
 
-    m_pool->Producer_add(pool, EPOLL_Jobs, pool);
+
+    m_pool->AddTask(EPOLL_Jobs, NULL);
     return TRUE;
 }
 
@@ -61,7 +59,6 @@ void TcpNet::Deletefd(int fd)
 
 void * TcpNet::EPOLL_Jobs(void * arg)
 {
-    pool_t *pool = (pool_t*)arg;
     int ready;
     int i = 0;
     while(1)
@@ -70,23 +67,23 @@ void * TcpNet::EPOLL_Jobs(void * arg)
         printf("%d\n",i++);
         if((ready = epoll_wait(m_pThis->epfd,m_pThis->epollarr,_DEF_EPOLLSIZE,-1)) == -1)
             err_str("Epoll Call Failed:",-1);//出错
-        m_pThis->Epoll_Deal(ready,pool);
+        m_pThis->Epoll_Deal(ready);
         bzero(m_pThis->epollarr,sizeof(epollarr));
     }
 }
 
-void TcpNet::Epoll_Deal(int ready,pool_t *pool)
+void TcpNet::Epoll_Deal(int ready)
 {
     int i = 0;
     for(i=0; i<ready; i++)
     {
         int fd = epollarr[i].data.fd;
         if(sockfd == fd)   //客户端建立链接
-            m_pool->Producer_add(pool,Accept_Deal,NULL);
+            m_pool->AddTask(Accept_Deal,NULL);
         else if(epollarr[i].events & EPOLLIN)
         {
             Deletefd(fd);
-            m_pool->Producer_add(pool,Info_Recv,(void*)fd);
+            m_pool->AddTask(Info_Recv,(void*)fd);
         }
     }
 }

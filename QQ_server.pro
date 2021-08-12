@@ -16,18 +16,18 @@ SOURCES += \
         src/Mysql.cpp \
         src/TCPKernel.cpp \
         src/TCPNet.cpp \
-        src/Thread_pool.cpp \
         src/err_str.cpp \
         src/main.cpp \
-        src/temp.cpp
+        src/temp.cpp \
+        src/thread_pool.cpp
 
 HEADERS += \
     include/Mysql.h \
     include/TCPKernel.h \
     include/TCPNet.h \
-    include/Thread_pool.h \
     include/err_str.h \
     include/packdef.h \
+    include/thread_pool.h \
     redis/RedisConfig.h \
     redis/RedisTools.h \
     spider/WBspider.h
